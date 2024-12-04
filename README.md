@@ -21,3 +21,17 @@ cd Beinf
    ```bash
    docker-compose up --build
    ```
+
+## Tech Stack:
+
+Backend:
+Framework: Python (FastAPI)
+Database: PostgreSQL
+Background Tasks: Celery (with RabbitMQ or Redis)
+Frontend:
+Simple HTML/CSS/JavaScript or React
+AWS Amplify for integration with Cognito
+Cloud Services:
+AWS Cognito for authentication
+AWS S3 for file storage
+LocalStack for local cloud service emulation
