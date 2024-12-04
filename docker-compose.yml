@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/code
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://postgres:password@db:5432/postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      LOCALSTACK_S3_ENDPOINT: http://localstack:4566
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      localstack:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./beinf_fronted
+      dockerfile: Dockerfile
+    container_name: frontend
+    volumes:
+      - ./beinf_fronted:/app
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:8000
+
+  db:
+    image: postgres:14
+    container_name: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - "./localstack_data:/var/lib/localstack"
+
+  celery:
+    build:
+      context: ./backend  # Change from ./celery_tasks to ./backend
+      dockerfile: Dockerfile
+    container_name: celery
+    command: celery -A app.celery_app worker --loglevel=info # Update the path
+    volumes:
+      - ./backend:/code  # Add volume mapping
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+  celery-beat:
+    build:
+      context: ./backend  # Change from ./celery_tasks to ./backend
+      dockerfile: Dockerfile
+    container_name: celery-beat
+    command: celery -A app.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/code  # Add volume mapping
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+volumes:
+  postgres_data:
+  localstack_data:
